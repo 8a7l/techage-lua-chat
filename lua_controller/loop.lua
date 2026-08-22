@@ -1,232 +1,200 @@
-num,msg = $get_msg()
+num,msg=$get_msg()
 
 if num then
 
-	cmd,arg = string.split2(msg," ",false,1)
+	cmd,arg=string.split2(msg," ",false,1)
 
-	if cmd == "/register" then
+	function get_name()
+		d=T.get(num)
+		if d then
+			n=$send_cmnd(d,"name")
+			if n and n~="" then return n end
+		end
+	end
+
+	function get_admin()
+		n=get_name()
+		if n and A.get(n) then return n end
+	end
+
+	function broadcast(s)
+		for t,x in T.next() do
+			$put_term(t,s)
+		end
+	end
+
+	function save_t()
+		$server_write(SERVER,"terminals",T)
+	end
+
+	function save_a()
+		$server_write(ADMIN_SERVER,"admins",A)
+	end
+
+	function save_m()
+		$server_write(STATE_SERVER,"muted",M)
+	end
+
+	if cmd=="/register" then
 
 		if arg then
-			T.set(num,arg)
-			$server_write(SERVER,"terminals",T)
+			name=$send_cmnd(arg,"name")
 
-			name = $send_cmnd(arg,"name")
-
-			if name and name ~= "" then
-				for t,d in T.next() do
-					$put_term(t,
-						"[system]: "..name..
-						" add New terminal "..num)
-				end
+			if name and A.get(name) then
+				T.set(num,arg)
+				save_t()
+				broadcast("[system]: "..name.." add New terminal "..num)
 			else
-				$put_term(num,"Registered: "..num)
+				$put_term(num,"No permission")
 			end
 		end
 
-	elseif cmd == "/unregister" then
+	elseif cmd=="/unregister" then
 
-		d = T.get(num)
+		d=T.get(num)
 
 		if d then
-			name = $send_cmnd(d,"name")
+			name=get_name()
 
-			if name and name ~= "" then
-				for t,x in T.next() do
-					$put_term(t,
-						"[system]: "..name..
-						" Removed Terminal "..num)
+			if name and A.get(name) then
+				target=arg or num
+				td=T.get(target)
+
+				if td then
+					broadcast("[system]: "..name..
+						" Removed Terminal "..target)
+
+					T.del(target)
+					save_t()
+
+					if target==num then
+						$put_term(num,"Unregistered")
+					end
+				else
+					$put_term(num,"Terminal not registered")
 				end
+			else
+				$put_term(num,"No permission")
 			end
-
-			T.del(num)
-			$server_write(SERVER,"terminals",T)
-
-			$put_term(num,"Unregistered")
 		else
 			$put_term(num,"Terminal not registered")
 		end
 
-	elseif cmd == "/list" then
+	elseif cmd=="/list" then
 
 		$put_term(num,"--- terminals ---")
 
 		for t,d in T.next() do
-			if M.get(t) then
-				$put_term(num,t.." -> "..d.." [MUTED]")
+			$put_term(num,t.." -> "..d..
+				(M.get(t) and " [MUTED]" or ""))
+		end
+
+	elseif cmd=="/mute" then
+
+		name=get_admin()
+
+		if name then
+			target=arg
+
+			if target and T.get(target) then
+				M.set(target,true)
+				save_m()
+				broadcast("[system]: "..name..
+					" muted Terminal "..target)
 			else
-				$put_term(num,t.." -> "..d)
+				$put_term(num,"Terminal not registered")
 			end
 		end
 
-	elseif cmd == "/mute" then
+	elseif cmd=="/unmute" then
 
-		d = T.get(num)
+		name=get_admin()
 
-		if d then
-			name = $send_cmnd(d,"name")
+		if name then
+			target=arg
 
-			if name and A.get(name) then
-
-				target = arg
-
-				if target and T.get(target) then
-
-					M.set(target,true)
-					$server_write(STATE_SERVER,"muted",M)
-
-					for t,x in T.next() do
-						$put_term(t,
-							"[system]: "..name..
-							" muted Terminal "..target)
-					end
-
-				else
-					$put_term(num,"Terminal not registered")
-				end
-
+			if target and T.get(target) then
+				M.del(target)
+				save_m()
+				broadcast("[system]: "..name..
+					" unmuted Terminal "..target)
 			else
-				$put_term(num,"No permission")
+				$put_term(num,"Terminal not registered")
 			end
 		end
 
-	elseif cmd == "/unmute" then
+	elseif cmd=="/admin_add" then
 
-		d = T.get(num)
+		name=get_admin()
 
-		if d then
-			name = $send_cmnd(d,"name")
+		if name then
+			if arg and arg~="" then
 
-			if name and A.get(name) then
-
-				target = arg
-
-				if target and T.get(target) then
-
-					M.del(target)
-					$server_write(STATE_SERVER,"muted",M)
-
-					for t,x in T.next() do
-						$put_term(t,
-							"[system]: "..name..
-							" unmuted Terminal "..target)
-					end
-
+				if not A.get(arg) then
+					A.set(arg,true)
+					save_a()
+					broadcast("[system]: "..name..
+						" added admin "..arg)
 				else
-					$put_term(num,"Terminal not registered")
+					$put_term(num,"Already an administrator")
 				end
 
 			else
-				$put_term(num,"No permission")
-			end
-		end
-
-	elseif cmd == "/admin_add" then
-
-		d = T.get(num)
-
-		if d then
-			name = $send_cmnd(d,"name")
-
-			if name and A.get(name) then
-
-				if arg and arg ~= "" then
-
-					if not A.get(arg) then
-						A.set(arg,true)
-						$server_write(ADMIN_SERVER,"admins",A)
-
-						for t,x in T.next() do
-							$put_term(t,
-								"[system]: "..name..
-								" added admin "..arg)
-						end
-					else
-						$put_term(num,"Already an administrator")
-					end
-
-				else
-					$put_term(num,
-						"[system]: Usage: /admin_add Nick")
-				end
-
-			else
-				$put_term(num,"No permission")
+				$put_term(num,
+					"[system]: Usage: /admin_add Nick")
 			end
 		else
-			$put_term(num,"Terminal not registered")
+			$put_term(num,"No permission")
 		end
 
-	elseif cmd == "/admin_del" then
+	elseif cmd=="/admin_del" then
 
-		d = T.get(num)
+		name=get_admin()
 
-		if d then
-			name = $send_cmnd(d,"name")
+		if name then
+			if arg and arg~="" then
 
-			if name and A.get(name) then
-
-				if arg and arg ~= "" then
-
-					if A.get(arg) then
-						A.del(arg)
-						$server_write(ADMIN_SERVER,"admins",A)
-
-						for t,x in T.next() do
-							$put_term(t,
-								"[system]: "..name..
-								" removed admin "..arg)
-						end
-					else
-						$put_term(num,"Not an administrator")
-					end
-
+				if A.get(arg) then
+					A.del(arg)
+					save_a()
+					broadcast("[system]: "..name..
+						" removed admin "..arg)
 				else
-					$put_term(num,
-						"[system]: Usage: /admin_del Nick")
+					$put_term(num,"Not an administrator")
 				end
 
 			else
-				$put_term(num,"No permission")
+				$put_term(num,
+					"[system]: Usage: /admin_del Nick")
 			end
 		else
-			$put_term(num,"Terminal not registered")
+			$put_term(num,"No permission")
 		end
 
-	elseif cmd == "/admin_list" then
+	elseif cmd=="/admin_list" then
 
-		d = T.get(num)
+		if get_admin() then
+			$put_term(num,"--- administrators ---")
 
-		if d then
-			name = $send_cmnd(d,"name")
-
-			if name and A.get(name) then
-
-				$put_term(num,"--- administrators ---")
-
-				for admin,value in A.next() do
-					$put_term(num,admin)
-				end
-
-			else
-				$put_term(num,"No permission")
+			for admin,value in A.next() do
+				$put_term(num,admin)
 			end
 		else
-			$put_term(num,"Terminal not registered")
+			$put_term(num,"No permission")
 		end
 
-elseif cmd == "/help" then
-	$put_term(num,"/register /unregister /list /help")
-	d=T.get(num)
-	if d then
-		n=$send_cmnd(d,"name")
-		if n and A.get(n) then
-			$put_term(num,"ADMIN: /mute /unmute /admin_add /admin_del /admin_list")
+	elseif cmd=="/help" then
+
+		$put_term(num,"/register /unregister /list /help")
+
+		if get_admin() then
+			$put_term(num,
+				"ADMIN: /mute /unmute /admin_add /admin_del /admin_list")
 		end
-	end
 
 	else
 
-		d = T.get(num)
+		d=T.get(num)
 
 		if d then
 
@@ -239,17 +207,15 @@ elseif cmd == "/help" then
 
 			else
 
-				name = $send_cmnd(d,"name")
+				name=get_name()
 
-				if name and name ~= "" then
+				if name then
 
 					$print("[CHAT] terminal="..num..
 						" player="..name..
 						" msg="..msg)
 
-					for t,x in T.next() do
-						$put_term(t,name..": "..msg)
-					end
+					broadcast(name..": "..msg)
 
 				else
 					$put_term(num,"Player not detected")
