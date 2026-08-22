@@ -1,42 +1,66 @@
--- Отримуємо повідомлення
-num, msg = $get_msg()
+num,msg = $get_msg()
 
 if num then
 
-    -- Шукаємо термінал, з якого прийшло повідомлення
-    sender_idx = nil
+	cmd,arg = string.split2(msg," ",false,1)
 
-    for i, terminal in TERMINALS.next() do
-        if terminal == num then
-            sender_idx = i
-        end
-    end
+if cmd == "/register" then
+	if arg then
+		T.set(num,arg)
+		$server_write(SERVER,"terminals",T)
 
-    -- Якщо термінал знайдений
-    if sender_idx then
+		name = $send_cmnd(arg,"name")
 
-        -- Визначаємо гравця через відповідний Player Detector
-        detector = DETECTORS.get(sender_idx)
-        player_name = $send_cmnd(detector, "name")
+		if name and name ~= "" then
+			for t,d in T.next() do
+				$put_term(t,"[system]: "..name.." add New terminal "..num)
+			end
+		else
+			$put_term(num,"Registered: "..num)
+		end
+	end
 
-        -- Перевіряємо, що детектор справді бачить гравця
-        if player_name and player_name ~= "" then
+elseif cmd == "/unregister" then
+	d = T.get(num)
 
-            -- Формуємо повідомлення
-            text = player_name .. ": " .. msg
+	if d then
+		name = $send_cmnd(d,"name")
 
-            -- Розсилаємо повідомлення на всі термінали
-            for i, terminal in TERMINALS.next() do
-                $put_term(terminal, text)
-            end
+		T.del(num)
+		$server_write(SERVER,"terminals",T)
 
-        else
-            -- Якщо гравця біля детектора немає
-            $put_term(num, "Помилка: гравця не знайдено.")
-        end
+		if name and name ~= "" then
+			for t,x in T.next() do
+				$put_term(t,"[system]: "..name.." Removed Terminal "..num)
+			end
+		end
 
-    else
-        -- Повідомлення прийшло не від зареєстрованого термінала
-        $print("Unknown terminal: " .. num)
-    end
+		$put_term(num,"Unregistered")
+	else
+		$put_term(num,"Terminal not registered")
+	end
+
+	elseif cmd == "/list" then
+		$put_term(num,"--- terminals ---")
+		for t,d in T.next() do
+			$put_term(num,t.." -> "..d)
+		end
+
+	else
+		d = T.get(num)
+
+		if d then
+			name = $send_cmnd(d,"name")
+
+			if name and name ~= "" then
+				for t,x in T.next() do
+					$put_term(t,name..": "..msg)
+				end
+			else
+				$put_term(num,"Player not detected")
+			end
+		else
+			$put_term(num,"Terminal not registered")
+		end
+	end
 end
