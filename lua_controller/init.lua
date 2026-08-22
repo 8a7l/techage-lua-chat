@@ -18,8 +18,8 @@ if not A then
 end
 
 -- Перший адміністратор
-if not A.get("Fody") then
-	A.set("Fody",true)
+if not A.get("YOU_NICHAME") then
+	A.set("YOU_NICHAME",true)
 	$server_write(ADMIN_SERVER,"admins",A)
 end
 
